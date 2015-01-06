@@ -1,0 +1,139 @@
+<html>
+	<head>
+		<script src="//cdn.videolinkplatform.com/vl_api.js"></script>
+		<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+        <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css" rel="stylesheet">
+	</head>
+<body>
+    <div class="container-fluid">
+        <h1>WebRTC secure peer to peer chat</h1>
+
+        <!-- Alert that will be shown until at least one user connects -->
+        <div class="alert alert-info" role="alert" id="status">Waiting for other users to connect (you can open this link in another tab, to talk with yourself)</div>
+
+        <!-- Show this for browsers that don't support WebRTC (yeah, there are still some) -->
+        <div class="alert alert-danger" role="alert" id="notsupported" style="display: none">Your browser doesn't support WebRTC. Try to open this page in latest Chrome or Firefox.</div>
+
+        <!-- Panel with chat messages log -->
+        <div class="panel panel-default">
+            <div class="panel-body" id="chatLog" style="height:300px;overflow-y: scroll"></div>
+        </div>
+
+        <!-- Controls for entering and sending message -->
+        <div class="row">
+            <div class="col-md-2">
+                <input class="form-control" type="text" id="myname" value="Anonymous" placeholder="Nickname" style="width:100%" disabled>
+            </div>
+            <div class="col-md-9">
+                <input class="form-control" type="text" id="message" placeholder="Enter message here" style="width:100%" disabled>
+            </div>
+            <div class="col-md-1">
+                <input type="button" id="send" value="Send" class="btn btn-primary" disabled>
+            </div>
+        </div>
+    </div>
+
+    <script language="javascript">
+        $(function() {
+            /**
+             * Add new message to log
+             */
+            function addMessageToLog(message) {
+                $('#chatLog').append('<div><b>' + message.from + '</b>: ' + message.text + '</div>');
+                //Scroll log down
+                $('#chatLog')[0].scrollTop = $('#chatLog')[0].scrollHeight;
+            }
+
+            /**
+             * Use helper function isWebRTC to determine if browser supports WebRTC, otherwise show sad message
+             */
+            if (isWebRTC()) {
+                /**
+                 * Create new connection to VideolinkPlatform signaling cloud and specify our API key and connection mode.
+                 * Second argument contains callback that will be called after connection is successfully established.
+                 */
+                new VideolinkPlatformConnector({
+                    apiKey: '58109df59af3c725f8ed0f2a0c65e341',
+                    connectionType: 'chat-only'
+                }, function(connector) {
+                    //Name of our room (free text)
+                    var roomName = 'text-chat';
+
+                    /*
+                     * Create room with specified name.
+                     * Second argument contains callback that will be called after room was created and is ready to be used.
+                     */
+                    connector.createRoom({name: roomName}, function(vlRoom) {
+                        /*
+                         * This event handler will be called each time user presses Enter inside message field or clicks
+                         * "Send" button and will send entered message together with user name to other participants via
+                         * direct peer to peer channel.
+                         */
+                        var sendMessage = function() {
+                            /*
+                             * Prepare message object that will be sent
+                             * type: free text field, that can be used to distinguish different message types
+                             * from: message author nickname
+                             * text: message text
+                             */
+                            var messageToSend = {
+                                type: 'chat-message',
+                                from: $('#myname').val(),
+                                text: $('#message').val()
+                            };
+
+                            //Add message to own chat log
+                            addMessageToLog(messageToSend);
+
+                            //Send prepared object to other participants
+                            vlRoom.sendDataMessage(messageToSend);
+
+                            //Clear message input
+                            $('#message').val('');
+                        };
+
+                        /**
+                         * Set created handler for button click and message input (when "enter" clicked) events
+                         */
+                        $('#send').click(sendMessage);
+                        $('#message').keyup(function(e){
+                            if(e.keyCode == 13) {
+                                sendMessage();
+                            }
+                        });
+
+                    }).on('onRemoteParticipantConnected', function() {
+                        /**
+                         * This event fires each time user connects to room.
+                         * If we are here, room is not empty anymore, so we can remove "waiting" alert and enable
+                         * inputs and send button.
+                         */
+                        $('#status').hide();
+                        $('input').prop('disabled', false);
+
+                    }).on('onEmpty', function() {
+                        /**
+                         * This event fires each time room becomes empty (all users left).
+                         * If we are here, there are no users left in the room except us, so nobody to send message to.
+                         * We can disable controls to don't send messages to nowhere.
+                         */
+                        $('#status').show();
+                        $('input').prop('disabled', true);
+
+                    }).on('onDataMessage', function(message) {
+                        /**
+                         * This event fires each time we receive message from other user.
+                         */
+                        addMessageToLog(message);
+                    })
+                })
+            } else {
+                $('#status').hide();
+                $('#notsupported').show();
+            }
+
+        })
+    </script>
+
+</body>
+</html>
