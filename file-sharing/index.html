@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>VideolinkPlatform - File sharing example</title>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="//cdn.videolinkplatform.com/vl_api.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+</head>
+
+<body>
+    <div class="container-fluid not-initialized">
+        <div class="row">
+            <div class="col-sm-6">
+                <h2>Sent files</h2>
+                <div id="dropzone-files" class="not-initialized">
+
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <h2>Received files</h2>
+                <div id="transmited-files">
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <script charset="utf-8">
+    (function($) {
+        'use strict';
+        $(function() {
+            //We will save File Sharing Service to this variable as soon as room will be created
+            var fileSharingService;
+
+            /**
+             * This method is called by Drag'n'drop interface when user droped file into container
+             * and receives selected files as argument.
+             * (it can also be called when file is selected in <input type="file">)
+             */
+            function sendP2PFile(file) {
+                if ( !! fileSharingService) {
+                    fileSharingService.startFileSharing(file);
+                } else {
+                    alert('File Sharing Service is not ready yet');
+                }
+            }
+
+            /**
+             * Called by onDownloadCompleted event, to show info about downloaded file
+             */
+            function addDownloadedFile(fileId, name, fileData, type, mime) {
+                $('#transmited-files').append('<a target="_blank" href="' + fileData + '" class="file-thumbnail col-sm-3"><i class="glyphicon glyphicon-file"></i> Open ' + name + '</a>');
+            }
+
+            function removeInitScreen() {
+                $('.container-fluid').removeClass('not-initialized');
+            }
+
+            /**
+             * Initialize connection to VideolinkPlatform Signaling Cloud and 
+             * establish text/data connection (so no video and audio stream will be sent)
+             */
+            var vlpConnector = new VideolinkPlatformConnector({
+                apiKey: '58109df59af3c725f8ed0f2a0c65e341',
+                connectionType: 'chat-only'
+            }, function(connector) {
+                /**
+                 * Create room with name "file-share". If room already exists we will just join it,
+                 * otherwise it will be created first.
+                 */
+                var roomName = 'file-share';
+                connector.createRoom({
+                    name: roomName
+                }, function(room) {
+                    /**
+                     * Room is ready, so we can retrieve File Sharing Service and prepare to file transfer
+                     */
+                    fileSharingService = room.getFileSharingService();
+                    removeInitScreen();
+
+                    /**
+                     * This event is fired when remote peer initiates file transfer
+                     */
+                    fileSharingService.onFileRequest(function(fileTransferId, name) {
+                        if (confirm('Would you like to download file: ' + name)) {
+                            fileSharingService.acceptFileSharingRequest(fileTransferId);
+                        }
+                    });
+
+                    /**
+                     * This event is fired when download is completed and we can show file info
+                     */
+                    fileSharingService.onDownloadCompleted(function(fileId, name, fileData, type, mime) {
+                        addDownloadedFile(fileId, name, fileData, type, mime);
+                    });
+
+                })
+            }, function(error) {
+                console.log(error);
+            })
+
+            /*********************************************************************
+             * Drag 'n drop functions via JQuery UI (just ignore them)
+             ********************************************************************/
+            var $dropZone = $('#dropzone-files'),
+                firstDrop = false;
+            if ('draggable' in document.createElement('span')) {
+                $dropZone[0].ondragover = function() {
+                    $dropZone.addClass('hover');
+                    return false;
+                };
+                $dropZone[0].ondragend = function() {
+                    $dropZone.removeClass('hover');
+                    return false;
+                };
+                $dropZone[0].ondrop = function(e) {
+                    if (!firstDrop) {
+                        $dropZone.removeClass('not-initialized');
+                        firstDrop = !firstDrop;
+                    }
+                    $dropZone.removeClass('hover');
+                    $dropZone.append('<div class="file-thumbnail col-sm-3"><i class="glyphicon glyphicon-file"></i>' + e.dataTransfer.files[0].name + '</div>');
+                    sendP2PFile(e.dataTransfer.files[0]);
+                    e.preventDefault();
+                }
+            } else {
+                $dropZone
+                    .removeClass('not-initialized')
+                    .append('<input type="file" name="tfile" id="tfile" value="" onchange="dndFallbackFn">');
+            }
+
+            function dndFallbackFn() {
+                sendP2PFile(this.files[0]);
+                return false;
+            }
+        })
+    })(
+        window.jQuery
+    );
+    </script>
+</body>
+
+</html>
