@@ -1,7 +1,7 @@
 html, body, .container-fluid, .row {
     height: 100%;
 }
-.col-sm-6 {
+.col-xs-6 {
     height: 100%;
     box-sizing: border-box;
     border: #dedede 1px solid;
